@@ -1,0 +1,19 @@
+# 渲染与生成产物
+frames/
+frames_v*/
+_probe/
+assets/rawgen/
+assets/cut/_*
+*.mp4
+*.wav
+*.mp3
+
+# 依赖
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+
+# 系统
+.DS_Store
+Thumbs.db
