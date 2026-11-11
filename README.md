@@ -7,6 +7,14 @@
 同一个模型、同一套素材，换一天可能就退化成图片轮播、字幕折行、结尾挂标点。
 这套东西的作用是：**开工先读规范，交付前跑脚本**，让「看起来还行」变成「测过通过」。
 
+**安装只要一行**（WorkBuddy / Claude Code 等 Agent Skill 运行时）：
+
+```bash
+git clone https://github.com/lyc4614/orangevideo.git ~/.workbuddy/skills/orangevideo
+```
+
+没装 git 就下载 ZIP 解压到同一位置，详见 [安装](#安装)。
+
 ---
 
 ## 它拦住了哪三次翻车
@@ -40,7 +48,7 @@
 
 ---
 
-## 目录
+## 仓库结构
 
 ```
 orangevideo/
@@ -63,23 +71,95 @@ orangevideo/
 
 ---
 
-## 怎么用
+## 安装
 
-### 作为 WorkBuddy / Claude Skill
+`SKILL.md` 在仓库根目录，所以**整个仓库本身就是一个技能包** —— 把仓库放进技能目录即可，
+不需要再挑子目录。仓库名正好等于技能名 `orangevideo`，直接用。
 
-把整个目录放进技能目录即可，`SKILL.md` 的 frontmatter 已经是标准格式：
+### 方式一：git clone（推荐，方便更新）
 
 ```bash
-# 用户级（所有项目可用）
-cp -r orangevideo ~/.workbuddy/skills/
-
-# 或项目级
-cp -r orangevideo <你的仓库>/.workbuddy/skills/
+# macOS / Linux
+mkdir -p ~/.workbuddy/skills
+git clone https://github.com/lyc4614/orangevideo.git ~/.workbuddy/skills/orangevideo
 ```
 
-之后说「做一条视频」就会自动加载。
+```powershell
+# Windows PowerShell
+$d = "$env:USERPROFILE\.workbuddy\skills"
+New-Item -ItemType Directory -Force -Path $d | Out-Null
+git clone https://github.com/lyc4614/orangevideo.git "$d\orangevideo"
+```
 
-### 单独用脚本
+### 方式二：下载压缩包（没装 git 也行）
+
+在仓库页点 **Code → Download ZIP**，解压后把文件夹**改名成 `orangevideo`**
+（压缩包默认叫 `orangevideo-main`），放进技能目录。
+
+或者一条命令搞定：
+
+```bash
+# macOS / Linux
+mkdir -p ~/.workbuddy/skills
+curl -L https://github.com/lyc4614/orangevideo/archive/refs/heads/main.tar.gz \
+  | tar -xz -C ~/.workbuddy/skills
+mv ~/.workbuddy/skills/orangevideo-main ~/.workbuddy/skills/orangevideo
+```
+
+```powershell
+# Windows PowerShell
+$d = "$env:USERPROFILE\.workbuddy\skills"
+New-Item -ItemType Directory -Force -Path $d | Out-Null
+Invoke-WebRequest "https://github.com/lyc4614/orangevideo/archive/refs/heads/main.zip" -OutFile "$env:TEMP\ov.zip"
+Expand-Archive "$env:TEMP\ov.zip" -DestinationPath $d -Force
+Rename-Item "$d\orangevideo-main" "orangevideo"
+```
+
+> **目录名要与 `SKILL.md` 里的 `name: orangevideo` 保持一致。** 不改也能跑，
+> 但部分加载器按目录名注册技能，装出来会是个奇怪的名字。
+
+### 装到哪里
+
+| 场景 | 路径 |
+|---|---|
+| **WorkBuddy 用户级**（所有项目可用，推荐） | `~/.workbuddy/skills/orangevideo/` |
+| **WorkBuddy 项目级**（只在某个仓库里生效，可提交给协作者） | `<你的项目>/.workbuddy/skills/orangevideo/` |
+| **Claude Code / 其他 Agent Skill 运行时** | `~/.claude/skills/orangevideo/` 等对应目录 |
+
+`references/` 和 `scripts/` 是纯文本，跨运行时都能用；`SKILL.md` 的 frontmatter 里
+`license` / `agent_created` 是 WorkBuddy 的附加字段，别的运行时会忽略。
+
+### 验证装好了
+
+```bash
+# 1) 结构对：能看到 SKILL.md / references / scripts
+ls ~/.workbuddy/skills/orangevideo
+
+# 2) 脚本能跑（不需要任何项目数据）
+python ~/.workbuddy/skills/orangevideo/scripts/check_spec.py --help
+python ~/.workbuddy/skills/orangevideo/scripts/build_cues.py --help
+```
+
+然后在对话里说「做一条口播视频」，技能会被自动加载。
+如果没反应，检查目录里 `SKILL.md` 是否在最外层（不要再套一层 `orangevideo/`）。
+
+### 更新
+
+```bash
+cd ~/.workbuddy/skills/orangevideo && git pull
+```
+
+压缩包装的没有 git 记录，重新下载覆盖即可（`references/` 和 `scripts/` 覆盖，别删整个目录）。
+
+### 卸载
+
+```bash
+rm -rf ~/.workbuddy/skills/orangevideo
+```
+
+---
+
+## 只用脚本
 
 脚本不依赖 Skill 机制，也不依赖任何私有资产：
 
