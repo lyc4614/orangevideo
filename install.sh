@@ -24,7 +24,21 @@ while [ $# -gt 0 ]; do
     --project)  ROOT="$(pwd)/.workbuddy/skills"; shift ;;
     --claude)   ROOT="${HOME}/.claude/skills"; shift ;;
     --force)    FORCE=1; shift ;;
-    -h|--help)  sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)
+      # 不能从 $0 读注释：`curl | bash` 时 $0 是 bash，文件根本不存在
+      cat <<'USAGE'
+orangevideo 安装脚本
+
+  默认装到 ~/.workbuddy/skills/orangevideo
+
+选项：
+  --dir <path>   装到指定技能根目录
+  --project      装到当前项目的 .workbuddy/skills（可随仓库提交给协作者）
+  --claude       装到 ~/.claude/skills
+  --force        目标已存在时覆盖
+  -h, --help     显示本帮助
+USAGE
+      exit 0 ;;
     *) echo "未知参数：$1（--help 看用法）" >&2; exit 2 ;;
   esac
 done
