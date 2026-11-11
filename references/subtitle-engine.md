@@ -80,10 +80,26 @@ const seg = src.slice(cuts[i], cuts[i+1])
       white-space:nowrap;                    /* ← 红线 1 的物理兜底 */
       color:#fff; text-shadow:0 2px 12px rgba(0,0,0,.7);
       letter-spacing:.02em; text-align:center }
+#capbar{ background:rgba(2,5,9,.60);          /* ← 60%，不要用不透明黑 */
+         border:1px solid rgba(150,190,230,.14); border-radius:12px;
+         padding:14px 40px; text-shadow:0 2px 12px rgba(0,0,0,.7) }
 ```
 
 `white-space:nowrap` 是最后一道保险：算法出错塞了长句，它会横向溢出被质检抓到，
 而不是悄悄折成两行。**不要改成 `normal` 去「自动适应」。**
+
+### 字幕条底色用 60%，不要用不透明黑
+
+2026-11-11 用户指着一帧说：「字幕的背景可以降低一下透明度，全黑的有时候会遮挡住背景的信息，
+这个黑色背景的透明度改成 60% 就好了。」
+
+不透明黑条的代价不是「丑」，是**它会把画面底部的信息整条切掉**：
+满幅图卡底部常有标签、胶囊、图例，字幕条一压上去就断成两截，观众以为图坏了。
+60% 之后底下的形状还能透出来，白字的可读性也够（60% 黑压在纯白上 ≈ 40% 亮度，
+白字对比度仍 > 5:1）。
+
+> 别再往上调回 `.74` 或 `.8`。真要提对比度，加 `text-shadow` 或 `backdrop-filter:blur(4px)`，
+> 而不是把底压死。
 
 ### ⚠ `left:50% + translateX(-50%)` 会把字幕条砍到半屏
 
