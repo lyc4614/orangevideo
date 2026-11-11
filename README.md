@@ -53,6 +53,8 @@ git clone https://github.com/lyc4614/orangevideo.git ~/.workbuddy/skills/orangev
 ```
 orangevideo/
 ├── SKILL.md                      红线、起片 SOP、脚本速查、交付 checklist、反例存档
+├── install.sh                    一键安装（macOS / Linux / Git Bash）
+├── install.ps1                   一键安装（Windows PowerShell）
 ├── references/
 │   ├── visual-rules.md           镜头模式与配比、hero/blur/plain 参数、版面固定值、转场
 │   ├── subtitle-engine.md        双源合并、字宽度量、断点惩罚、960 陷阱
@@ -76,7 +78,42 @@ orangevideo/
 `SKILL.md` 在仓库根目录，所以**整个仓库本身就是一个技能包** —— 把仓库放进技能目录即可，
 不需要再挑子目录。仓库名正好等于技能名 `orangevideo`，直接用。
 
-### 方式一：git clone（推荐，方便更新）
+### 最快：把这句话丢给 Agent
+
+```
+帮我装这个技能：https://github.com/lyc4614/orangevideo
+装到 ~/.workbuddy/skills/orangevideo，装完跑一下 scripts/check_spec.py --help 确认能用
+```
+
+仓库里带了 `install.sh` / `install.ps1`，Agent 直接执行即可，不用自己拼命令：
+
+```bash
+# 它内部会做的事：下载 → 解压 → 改名 → 放到技能目录 → 校验 SKILL.md
+bash install.sh              # 默认装到 ~/.workbuddy/skills
+bash install.sh --project    # 装到当前项目的 .workbuddy/skills
+```
+
+> **WorkBuddy 自带的「安装技能」搜不到这个仓库。** 那个入口（`search_and_install_skills`）
+> 走的是技能市场索引，按名称搜，不接受任意 GitHub 地址。所以从 GitHub 装只有两条路：
+> 让 Agent 跑 `install.sh`，或者你自己执行下面的一行命令。
+
+### 一行命令
+
+```bash
+# macOS / Linux（默认装到 ~/.workbuddy/skills）
+curl -fsSL https://raw.githubusercontent.com/lyc4614/orangevideo/main/install.sh | bash
+```
+
+```powershell
+# Windows PowerShell
+irm https://raw.githubusercontent.com/lyc4614/orangevideo/main/install.ps1 | iex
+```
+
+加参数：`bash -s -- --project` / `-Dir D:\skills`，`--force` 覆盖已装版本。
+
+> 装到别处不是必须的 —— 默认路径就是 WorkBuddy 的用户级技能目录。
+
+### 方式一：git clone（想随时 `git pull` 更新就用这个）
 
 ```bash
 # macOS / Linux
@@ -146,10 +183,19 @@ python ~/.workbuddy/skills/orangevideo/scripts/build_cues.py --help
 ### 更新
 
 ```bash
+# git clone 装的
 cd ~/.workbuddy/skills/orangevideo && git pull
+
+# 用 install.sh 装的（没有 git 记录，直接覆盖）
+bash install.sh --force
 ```
 
-压缩包装的没有 git 记录，重新下载覆盖即可（`references/` 和 `scripts/` 覆盖，别删整个目录）。
+```powershell
+# PowerShell 装的
+.\install.ps1 -Force
+```
+
+覆盖只动技能文件，不会碰你自己的工程目录。
 
 ### 卸载
 
