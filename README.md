@@ -40,9 +40,12 @@ git clone https://github.com/lyc4614/orangevideo.git ~/.workbuddy/skills/orangev
 | 3 | **图片是主体，解释动画是标点** | 两边都错：`full` 100% 是轮播，`full` 8% 是把用户的图全糊了 |
 | 4 | 画面**不留非必要小字** | 「注：」「来源：」这类小字会把干净的版面拖脏 |
 
-红线 3 是**双边约束**，健康区间：`full` 30–65% / `blur·hero` 25–45% / `plain` ≤ 15%。
-而且解释层必须带实体 —— 3D 素材或有形状的图形组件，
+红线 3 是**双边约束**，健康区间：`full` 30–65% / `blur` 25–45% / `plain` ≤ 15%。
+而且解释层必须带实体 —— 一块会动的数据图表，或一张结构化卡片，
 不能只有「深色底 + 三行字」，那等于什么都没讲。
+
+> **2026-11-17 起 3D 素材停用。** 原作者原话：「3D 素材库的素材都不是很好，不能起到对文本很好的解释作用」。
+> 解释层统一走 **修饰卡片 + 动态数据图表**，见 `references/explain-components.md`。
 
 > **一句话：全程只有逗号（全是解释层）和全程没有标点（全是图片）一样糟。**
 
@@ -56,9 +59,9 @@ orangevideo/
 ├── install.sh                    一键安装（macOS / Linux / Git Bash）
 ├── install.ps1                   一键安装（Windows PowerShell）
 ├── references/
-│   ├── visual-rules.md           镜头模式与配比、hero/blur/plain 参数、版面固定值、转场
+│   ├── visual-rules.md           镜头模式与配比、full/blur/plain 参数、版面固定值、fit 烤字保护
+│   ├── explain-components.md     8 种解释层组件：分档/轨道/环形/条形/阶梯/分击/对比/胶囊
 │   ├── subtitle-engine.md        双源合并、字宽度量、断点惩罚、960 陷阱
-│   ├── assets-3d.md              素材合格线、ImageGen 提示词、泛洪抠图、暗素材提亮
 │   ├── audio-tts.md              音色锁定、数字读法、复读检测、两遍 loudnorm
 │   └── render-pipeline.md        puppeteer 渲染、TV range 编码、四项体检、交付归档
 └── scripts/
@@ -68,7 +71,7 @@ orangevideo/
     ├── still.cjs                 按时间点出静帧，验收单镜
     ├── render.cjs                逐帧渲染 + 编码
     ├── mkloudnorm.py             两遍 loudnorm + 可选直出混流 + 自动复测
-    └── mkcut4.cjs                品红底区域生长泛洪抠图
+    └── mkcut4.cjs                品红底区域生长泛洪抠图（旧 3D 素材流程遗留，解释层用不上）
 ```
 
 ---
@@ -252,15 +255,14 @@ npm i puppeteer-core
 
 ## 关于本地资产
 
-仓库里提到的 `examples/<工程名>/`、`素材库/`、`tools/tts/` 是作者本地的私有资产，
+仓库里提到的 `examples/<工程名>/`、`tools/tts/` 是作者本地的私有资产，
 **没有随仓库发布**，那几个路径只是命名示意。
 
 不影响使用：
 
 - 七个脚本全都只吃你给的文件和参数，不读这些目录。
-- `hero` 版式的 DOM、CSS、参数在 `references/visual-rules.md` 里写全了，可以照着自己搭。
-- 没有现成 3D 素材库，就用 `references/assets-3d.md` 里的 ImageGen 提示词锚点自己生成，
-  再用 `mkcut4.cjs` 抠图。
+- 解释层组件的 DOM、CSS、字段和坐标在 `references/explain-components.md` 里写全了，
+  照着自己搭一遍不到半天；`visual-rules.md` 里有配比、版面固定值和 `fit` 做法。
 - 没有现成 TTS，接你自己的；复读检测的判据在 `references/audio-tts.md` 里，
   照着重写不到 100 行。
 

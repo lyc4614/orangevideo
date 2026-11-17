@@ -107,11 +107,10 @@ ffprobe -v error -show_entries format=duration,size \
 ├── index.html            # 引擎 + 样式
 ├── shots.js              # SHOTS 数组 + 后半段引擎（别重写引擎）
 ├── data/cues.json        # 单行字幕
-├── assets/               # kj01.jpg … 图卡；mat/ 3D 素材
-├── assets/rawgen/        # ImageGen 原图（留档，别删）
+├── assets/               # kj01.jpg … 用户给的图卡
 ├── audio/                # pp.wav / pp_norm.wav
 ├── frames_v1|v2|v3/      # 每次重渲换新目录
-├── render.cjs / still.cjs / mkcut4.cjs
+├── render.cjs / still.cjs
 └── out_v1.mp4 …
 ```
 
@@ -120,6 +119,8 @@ ffprobe -v error -show_entries format=duration,size \
 
 ## 七、引擎别重写
 
-`shots.js` 后半段（`build` / `hero` / `stage` / `shelf` / `fade`）是从成熟工程拷来的，
+`shots.js` 后半段（`build` / `fade` / 8 种解释层组件）是从成熟工程拷来的，
 **只替换前半段的 `SHOTS` 数组和 `assets/`**。
 每次重写引擎都会重新踩一遍淡入淡出、推镜、字幕条定位的坑。
+
+（`hero` / `stage` / `shelf` 那三套 3D 素材版式 2026-11-17 起停用，引擎里已经不再调用。）

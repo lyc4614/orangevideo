@@ -167,20 +167,19 @@ def check_shots(path, full_min=0.30, full_max=0.65, blur_min=0.25, dur_max=11.0)
         elif br > 0.55:
             warns.append(f"解释层占 {br*100:.0f}%，偏多：图片看得清的镜头可能不够")
 
-    # 解释层不能只有字：blur/hero 镜要么带 type（有自己的图形组件），要么带 mat 素材
+    # 解释层不能只有字：blur 镜必须带 type（修饰卡片 / 数据图表组件）。3D 素材版式已于 2026-11-17 停用
     shot_blocks = re.split(r"\}\s*,\s*\{", src)
     empty = []
     for b in shot_blocks:
         if not re.search(r"""["']?mode["']?\s*:\s*["'](blur|hero)["']""", b):
             continue
         has_type = re.search(r"""["']?type["']?\s*:""", b)
-        has_mat = re.search(r"""["']?mat["']?\s*:""", b)
-        if not (has_type or has_mat):
+        if not has_type:
             t0 = re.search(r"""["']?t0["']?\s*:\s*([\d.]+)""", b)
             empty.append(t0.group(1) if t0 else "?")
     if empty:
         errors.append(
-            "红线4 有 " + str(len(empty)) + " 个解释层镜头既无 type 也无 3D 素材，"
+            "红线4 有 " + str(len(empty)) + " 个解释层镜头没有 type（组件），"
             "只剩「深色模糊底 + 几行字」（t0=" + ", ".join(empty) + "）"
         )
 
