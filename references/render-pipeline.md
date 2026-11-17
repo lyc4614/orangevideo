@@ -88,6 +88,8 @@ ffprobe -v error -show_entries format=duration,size \
 ```
 
 判定线：`-16.7±0.6 LUFS` / `≤ -1.0 dBTP` / 0 黑帧 / 0 长静音 / 1920×1080@30。
+外加 `mkloudnorm.py --check`：开头 0–3 秒不能比全片有声段中位低 1 dB 以上
+（低过就是动态响度在爬坡，用户的耳朵会先发现）。
 
 ## 五、交付规矩（一条片子只有一个位置）
 

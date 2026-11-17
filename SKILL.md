@@ -68,8 +68,9 @@ TIMES=48.5,80.5,119 node scripts/still.cjs
 PUPPETEER_NM="<含 puppeteer-core 的 node_modules>" \
   FRAME_DIR=frames_v3 OUT=out_v3.mp4 node scripts/render.cjs
 
-# ⑦ 两遍 loudnorm 混流 + 四项体检
+# ⑦ 常数增益混流（不要 dynamic loudnorm）+ 体检
 python scripts/mkloudnorm.py --in audio/pp.wav --video out_v3.mp4 --out 成片.mp4
+python scripts/mkloudnorm.py --check 成片.mp4    # 开头 0–3s vs 全片中位，低 1dB 就报警
 ```
 
 ## 二、解释层的取用（红线 3 的落地）
@@ -110,7 +111,7 @@ python scripts/mkloudnorm.py --in audio/pp.wav --video out_v3.mp4 --out 成片.m
 | `scripts/check_cap_render.cjs` | **字幕渲染层**体检（抓浏览器折行） | `<index.html>` |
 | `scripts/still.cjs` | 按时间点出静帧验收 | `TIMES=48.5,80.5` |
 | `scripts/render.cjs` | 逐帧渲染 + 编码 | `FRAME_DIR` `OUT` `START` `END` `NOENC` |
-| `scripts/mkloudnorm.py` | 两遍 loudnorm，可直出混流 | `--in --out --video --measure` |
+| `scripts/mkloudnorm.py` | **常数增益 + 限幅**混流/体检（默认 flat，不用 dynamic） | `--in --out --video --measure --check` |
 | `scripts/mkcut4.cjs` | 品红底泛洪抠图 | `<源图> <名字> [裁底部px] [pad] [容差]` |
 
 `check_spec.py` 判定口径：`full` 30–65%、`blur` 25–45%、`plain` ≤15%、
@@ -124,7 +125,9 @@ python scripts/mkloudnorm.py --in audio/pp.wav --video out_v3.mp4 --out 成片.m
 - [ ] 字幕没盖住画面里烤死的文字
 - [ ] 每个解释层镜的组件对得上这句话（把该镜字幕抄出来，逐句问「这块图能回答吗」）
 - [ ] 8 个以上解释镜至少用到 5 种组件形态，没有全片一个样
-- [ ] 响度 `-16.7±0.6 LUFS` / `≤ -1.0 dBTP`（两遍 loudnorm）
+- [ ] 响度 `-16.7±0.6 LUFS` / `≤ -1.0 dBTP`（`mkloudnorm.py` 常数增益，不是 dynamic loudnorm）
+- [ ] `mkloudnorm.py --check` 通过：开头 0–3 秒不比全片中位低 1 dB 以上
+- [ ] 音频是**双声道**，不是单声道
 - [ ] 0 黑帧 / 0 长静音
 - [ ] 编码显式转 TV range（`in_range=full:out_range=tv`）
 - [ ] 口播跑过复读检测（用户对这条最敏感）

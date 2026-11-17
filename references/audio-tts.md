@@ -47,22 +47,56 @@ python tools/tts/detect_repeat.py 音频.wav --txt 已有的asr文本.txt
 
 任何一条命中都要重生成那一段，不要「反正听不太出来」。
 
-## 五、响度：必须两遍 loudnorm
+## 五、响度：常数增益 + 限幅（**不要用 dynamic loudnorm**）
 
 ```bash
-python scripts/mkloudnorm.py --in audio/pp.wav --out audio/pp_norm.wav
 # 归一 + 直接混流（视频流 copy，不动画质）
 python scripts/mkloudnorm.py --in audio/pp.wav --video out.mp4 --out 成片.mp4
-# 只测
+# 只测响度
 python scripts/mkloudnorm.py --measure 成片.mp4
+# 体检：开头 0–3 秒 vs 全片有声段中位数（**交付前必跑**）
+python scripts/mkloudnorm.py --check 成片.mp4
 ```
 
-单遍 `loudnorm` 是动态归一，**实测偏低**（目标 -16 出 -19.1）。
-正确做法是第一遍 `print_format=json` 只测不写，拿到 `measured_*` 后第二遍带
-`measured_I / measured_TP / measured_LRA / measured_thresh / offset` 再跑一次。
+本系列统一：**I = -16.7±0.6 LUFS / TP ≤ -1.0 dBTP**。
 
-本系列统一：**I = -16.7 LUFS / TP ≈ -1.4 dBTP / LRA = 11**。
-脚本第二遍跑完会自动复测，偏差 > 0.6 LU 会报警。
+### 为什么不能两遍 loudnorm
+
+两遍 loudnorm 只有当 `linear=true` **能成立**时才是常数增益。一旦源素材
+真峰值高（-0.1 dBTP）而积分响度低（-19 LUFS），「+2 dB 增益」会把峰值顶到 +1.9 dBTP，
+ffmpeg 就**悄悄退化成 Dynamic**：
+
+```
+Normalization Type:   Dynamic     ← 第二遍 stderr 里就有这行，以前没人看
+```
+
+Dynamic 是**随时间变化**的增益。实测同一条 173s 的人声，每 0.2 秒的实测增益在
+**-1.5 ~ +3.1 dB** 之间摆，标准差 0.88 dB。听感上就是「有的地方轻、有的地方重」，
+素材本身开头偏弱时，就会变成用户说的「**开头几秒人声小，随后才变大**」。
+
+`mkloudnorm.py` 现在的默认 `--mode flat`：
+
+1. loudnorm 只用来**测量**（拿 input_i / input_tp）
+2. `alimiter` 只压那几下最高点（attack 5ms / release 120ms / level=false）
+3. **先上混成双声道再限幅** —— mono→stereo 每声道天然低 3 dB，等于白送 3 dB 峰顶余量，
+   限幅要压的量从 3.7 dB 降到 0.3 dB 以内，增益曲线才真的平（实测标准差 0.36 dB，
+   且开头与全片差 +0.07 dB）
+4. 复测 I / TP，偏差 > 0.25 LU 自动补一次增益
+
+`--mode loudnorm` 只为对照排查保留，**默认路径里已经没有 dynamic**。
+
+### 交付前的「开头小声」判定
+
+`--check` 会解码整片，逐 100ms 统计有声帧电平，输出：
+
+```
+有声段电平：前 3 秒 -20.6 dB / 全片中位 -21.3 dB / 差 +0.8 dB
+逐 5 秒： 0:-21.7 5:-23.1 10:-20.5 …
+```
+
+**前 3 秒比全片中位低 1 dB 以上就报警**。这是唯一可靠的自动判定 ——
+靠耳朵听「是不是开头轻」会被素材本身的语气带偏。
+
 
 ## 六、口播节奏要不要改，先看 CV
 
@@ -71,7 +105,8 @@ python scripts/mkloudnorm.py --measure 成片.mp4
 
 ## 七、交付音频规格
 
-- 48kHz、单声道（口播片不需要立体声）
+- 48kHz、**双声道**（单声道源复制成 L/R 两路。真正的单声道文件在部分播放器 / 系统上
+  会按 -3 dB 居中增益播放，听起来比预览时轻一截，用户会以为是「音频做小了」）
 - AAC 192k（成片混流时）
 - 不配 BGM（用户未提供曲库，历史默认静音人声）
 
