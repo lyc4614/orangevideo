@@ -3,7 +3,8 @@ name: orangevideo
 description: |
   橙子老师视频成片流水线（口播音频 / 文稿 / 图卡 → 横屏成片）。本 skill 是「做视频」类任务的
   唯一入口：做视频、出成片、剪一条片子、改这条片子、根据文稿或 SRT 做口播视频、写分镜、
-  配字幕、给图卡做动画、渲染、压片、交付。也用于为这类视频配音，或复用定制知识讲解男声、轻播客音色。
+  配字幕、给图卡做动画、渲染、压片、交付。只有原稿需要自动配音、按口播对齐并制作成片时也用本技能。
+  口播可沿用已确认的定制知识讲解男声及轻播客音色。
   承载四条不能破的视觉红线（字幕单行不换行、结尾不带标点、图片是主体解释动画是标点、
   画面不留非必要小字）、字幕引擎、解释层组件（修饰卡片 / 动态数据图表）、渲染编码、响度与交付规矩。
 license: MIT
@@ -45,10 +46,12 @@ agent_created: true
 
 ## 一、起片 SOP（按顺序做，别跳）
 
-只有文稿且指定「定制知识讲解男声」或「轻播客」时，从
-[Qwen3-TTS 本地轻播客口播](references/audio-tts.md#本地-qwen3-tts-轻播客口播)
-生成 `audio/pp.wav`。用成品口播转写带时间轴的 `audio/source.srt`，再从第 ① 步起片。
-已有用户指定的录音时，直接使用录音；缺 SRT 时从该录音转写。
+**只有原稿就起片。** 按 [纯文稿到成片](references/text-to-video.md) 依次完成配音、实际语音对齐、
+语义分镜、渲染、混流和验收。升学与知识讲解默认使用本机已确认的轻播客知识讲解男声，显式指定的音色或录音优先。
+分镜和动画以成品口播的时间标记为准。没有图卡时按原稿制作信息图卡和解释组件。
+
+已有录音和 SRT 时，从下方现有工程入口开始。只有录音时，先用
+`align_narration.py` 对齐原稿。纯文稿入口生成的字幕已按实际音频对齐，可直接进入分镜。
 
 ```bash
 # ① 字幕：SRT 时间轴 + 原稿标点 双源合并 → 单行、无句尾标点
@@ -63,8 +66,7 @@ python scripts/check_spec.py data/cues.json --fix data/cues.json   # 兜底再�
 #    full 30–65% / blur 25–45% / plain ≤15%，单镜 ≤ 11s
 #    一镜一图的写法在这一步就会变成图片轮播
 
-# ④ 引擎：拷一个成熟工程的 index.html + shots.js，只换 SHOTS 数组和 assets/
-#    组件 build（band/track/ring/hbars/ladder/split/versus/subj）已经有了，直接用
+# ④ 引擎：复用成熟工程；新工程可用 prepare_video.py 载入随包模板
 
 # ⑤ 静帧验收：先出 8–10 张静帧人眼过一遍，再开全片
 TIMES=48.5,80.5,119 node scripts/still.cjs
@@ -118,6 +120,8 @@ python scripts/mkloudnorm.py --check 成片.mp4    # 开头 0–3s vs 全片中�
 | `scripts/render.cjs` | 逐帧渲染 + 编码 | `FRAME_DIR` `OUT` `START` `END` `NOENC` |
 | `scripts/mkloudnorm.py` | **常数增益 + 限幅**混流/体检（默认 flat，不用 dynamic） | `--in --out --video --measure --check` |
 | `scripts/qwen3_podcast.py` | 本地定制男声与轻播客后期 | `--text` 或 `--input-wav`，`--out` |
+| `scripts/align_narration.py` | 最终口播和原稿对齐，导出 SRT 和词级 JSON | `--audio --text --model --out-json --out-srt` |
+| `scripts/prepare_video.py` | 根据真实字幕起点编排镜头并创建渲染工程 | `--timeline --plan --project` |
 | `scripts/mkcut4.cjs` | 品红底泛洪抠图 | `<源图> <名字> [裁底部px] [pad] [容差]` |
 
 `check_spec.py` 判定口径：`full` 30–65%、`blur` 25–45%、`plain` ≤15%、
@@ -148,6 +152,7 @@ python scripts/mkloudnorm.py --check 成片.mp4    # 开头 0–3s vs 全片中�
 | [references/visual-rules.md](references/visual-rules.md) | 定分镜、调配比、`full`/`blur`/`plain` 参数、版面固定值、`fit` 烤字保护 |
 | [references/explain-components.md](references/explain-components.md) | **选哪种组件、字段怎么填、卡片怎么修饰、组件版式踩坑** |
 | [references/audio-tts.md](references/audio-tts.md) | 口播、音色、数字读法、复读检测、响度 |
+| [references/text-to-video.md](references/text-to-video.md) | 只给原稿，自动配音、词级对齐、分镜、渲染与交付 |
 | [references/render-pipeline.md](references/render-pipeline.md) | 渲染、编码、体检、交付归档、工程目录 |
 
 ## 六、反例存档（2026-11-10 `keji2027`，用户点名批评）

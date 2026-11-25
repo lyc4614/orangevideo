@@ -28,8 +28,8 @@
    FFmpeg 可通过 `PATH` 或 `FFMPEG` 环境变量指定。模型和软件安装见
    [Qwen3-TTS 官方项目](https://github.com/QwenLM/Qwen3-TTS)。
    口播稿用 UTF-8 纯文本，保留标点与段落，按读法展开数字并去掉 Markdown 标记。
-   字幕仍用原稿。长稿按完整句段分批，同一对参考文件配合 `--dry-out` 导出各段干声。
-   逐段核对后按原顺序拼接，再给整轨统一做后期。
+   字幕仍用原稿。长稿由脚本按句段和标点分批，复用同一对声音参考，再拼接整轨做一次后期。
+   `--dry-out` 可以单独保留朗读干声，`--max-chars` 可调整合成分段上限。
 3. **按原朗读做轻播客后期。** 先做 A 版柔化（3 kHz −3.8 dB、5.1 kHz 高频搁架 −3.2 dB、
    180 Hz 低频搁架 +1.1 dB），再做 C 版（58 Hz 高通、170 Hz +1.65 dB、335 Hz −0.85 dB、
    1.15 kHz +0.45 dB、轻压缩 1.55∶1，起音 14 ms、释放 125 ms）。
@@ -45,41 +45,9 @@ python "path/to/orangevideo/scripts/qwen3_podcast.py" --text "audio/口播稿.tx
 python "path/to/orangevideo/scripts/qwen3_podcast.py" --input-wav audio/tts_raw.wav --out audio/pp.wav
 ```
 
-用本地 ASR 对最终 `audio/pp.wav` 生成带时间轴的 `audio/source.srt`。核对专名、数字、关键句和句尾，
-并按第四节查复读后，再进 `build_cues.py`。成片响度在混流阶段按第五节处理。
+用 `align_narration.py` 对最终 `audio/pp.wav` 按词对齐原稿并导出 SRT 和 JSON。详见[纯文稿到成片](text-to-video.md#2-依实际口播生成时间轴)。
+核对专名、数字、关键句和句尾，再按第四节查复读并继续排镜。成片响度在混流阶段按第五节处理。
 参考录音、参考稿和模型权重保存在本地工作区。
-
-工程缺少 SRT 生成器时，可用已安装的 `faster-whisper` 和本地模型走下方步骤。
-模型目录替换成实际位置，转写后仍按原稿核对。
-
-```python
-from pathlib import Path
-
-import soundfile
-from faster_whisper import WhisperModel
-
-
-def timestamp(seconds):
-    hours, remainder = divmod(round(seconds * 1000), 3_600_000)
-    minutes, remainder = divmod(remainder, 60_000)
-    secs, ms = divmod(remainder, 1000)
-    return f"{hours:02}:{minutes:02}:{secs:02},{ms:03}"
-
-
-model = WhisperModel("models/faster-whisper-small", device="cpu", compute_type="int8", local_files_only=True)
-audio_path = "audio/pp.wav"
-duration = soundfile.info(audio_path).duration
-segments, _ = model.transcribe(audio_path, language="zh")
-with Path("audio/source.srt").open("w", encoding="utf-8") as srt:
-    index = 0
-    for segment in segments:
-        end = min(segment.end, duration)
-        text = segment.text.strip()
-        if end <= segment.start or not text:
-            continue
-        index += 1
-        srt.write(f"{index}\n{timestamp(segment.start)} --> {timestamp(end)}\n{text}\n\n")
-```
 
 ## 二、停顿表（跟标点走）
 

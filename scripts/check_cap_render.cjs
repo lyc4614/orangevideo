@@ -13,6 +13,7 @@
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 
 // 解析 puppeteer-core：优先本地 node_modules，其次环境变量 PUPPETEER_NM / NODE_PATH
 function loadPuppeteer() {
@@ -36,10 +37,12 @@ const SAFE_H = 1.6;       // 行高倍数上限（1 行 = 1.0，2 行 ≈ 2.0）
 
 function findChrome() {
   const c = [
+    process.env.CHROME_PATH,
     'C:/Program Files/Google/Chrome/Application/chrome.exe',
     (process.env.LOCALAPPDATA || '') + '/Google/Chrome/Application/chrome.exe',
+    'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
   ];
-  for (const p of c) if (fs.existsSync(p)) return p;
+  for (const p of c) if (p && fs.existsSync(p)) return p;
   throw new Error('找不到 Chrome');
 }
 
@@ -52,7 +55,7 @@ function findChrome() {
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
-  await page.goto('file:///' + PAGE.replace(/\\/g, '/'), { waitUntil: 'load' });
+  await page.goto(pathToFileURL(PAGE).href, { waitUntil: 'load' });
   await page.waitForFunction('typeof window.__render === "function"');
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -61,6 +64,7 @@ function findChrome() {
   const res = await page.evaluate(async (MAX_W, SAFE_H) => {
     // `const CUES = [...]` 不会挂到 window 上，但同作用域可直接引用
     const CUESX = typeof CUES !== 'undefined' ? CUES : window.CUES || [];
+    if (!CUESX.length) return { error: '页面未加载任何带时间轴的字幕' };
     const bar = document.getElementById('capbar') || document.querySelector('[id*="cap"]');
     if (!bar) return { error: '页面上找不到字幕条元素（id 含 cap）' };
     const inner = bar.querySelector('span') || bar;
@@ -72,7 +76,9 @@ function findChrome() {
     const bad = [];
     let maxW = 0;
     for (const c of CUESX) {
-      const t = (c.s !== undefined ? c.s : c.t0) + 0.02;
+      const start = c.s ?? c.t0;
+      const end = c.e ?? c.t1;
+      const t = start + Math.min(0.02, (end - start) / 2);
       window.__render(t);
       await new Promise((r) => setTimeout(r, 18));
       const bb = bar.getBoundingClientRect();
@@ -80,7 +86,11 @@ function findChrome() {
       const rects = inner.getClientRects().length;
       const lines = Math.round(bb.height / oneLine);
       const txt = c.t !== undefined ? c.t : c.text;
-      if (rects > 1 || lines > 1 || bb.height > oneLine * SAFE_H) {
+      const content = inner.textContent.trim();
+      const textBox = inner.getBoundingClientRect();
+      if (content !== txt.trim() || textBox.left < bb.left || textBox.right > bb.right) {
+        bad.push({ t: txt, lines, h: Math.round(bb.height), barW: Math.round(bb.width), mismatch: true });
+      } else if (rects > 1 || lines > 1 || bb.height > oneLine * SAFE_H) {
         bad.push({ t: txt, lines, h: Math.round(bb.height), barW: Math.round(bb.width) });
       } else if (bb.width > MAX_W) {
         bad.push({ t: txt, lines, h: Math.round(bb.height), barW: Math.round(bb.width), over: true });
@@ -104,7 +114,8 @@ function findChrome() {
     );
   }
   for (const b of res.bad) {
-    console.log(`✗ ${b.lines} 行 / 高 ${b.h}px / 宽 ${b.barW}px：${b.t}`);
+    const issue = b.mismatch ? '字幕缺失、不符或溢出' : `${b.lines} 行 / 高 ${b.h}px / 宽 ${b.barW}px`;
+    console.log(`✗ ${issue}：${b.t}`);
   }
   console.log();
   console.log(res.bad.length ? `${res.bad.length} 条不是单行 —— 不通过` : '全部单行 —— 通过');

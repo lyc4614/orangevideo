@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OrangeVideo</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; overflow: hidden; color: #f5f8f9; background: #132737;
+    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+  main, .shot { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+  .shot { position: absolute; inset: 0; background: radial-gradient(ellipse at 84% 16%, #28586b, #132737 62%); }
+  .shot.full { background: linear-gradient(120deg, #183447, #28586b); }
+  .shot > img { position: absolute; width: 100%; height: 100%; object-fit: contain; }
+  .shot.blur > img { object-fit: cover; filter: blur(23px) brightness(.28); transform: scale(1.05); }
+  .shot.full.photo h1 { top: 76px; width: max-content; max-width: 1600px; padding: 18px 34px;
+    border-radius: 16px; background: #182a39e8; font-size: 62px; }
+  h1 { position: absolute; left: 120px; right: 120px; top: 123px; margin: 0;
+    font-size: 86px; line-height: 1.17; font-weight: 850; overflow-wrap: anywhere; }
+  .plain h1 { left: 180px; right: 180px; top: 47%; transform: translateY(-50%); font-size: 114px; }
+  .items { position: absolute; inset: 312px 120px 210px; display: grid;
+    grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: 28px; align-content: center; }
+  article { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 20px;
+    min-height: 346px; min-width: 0; padding: 34px 38px; border: 2px solid #91c9d45c;
+    border-radius: 26px; background: linear-gradient(145deg, #244b5d, #182f42);
+    box-shadow: 0 14px 36px #0715244d; overflow-wrap: anywhere; }
+  article::before { content: ""; display: block; width: 86px; height: 6px; border-radius: 4px; background: #81e1d1; }
+  .full article:only-child { min-height: 364px; padding-inline: 60px; }
+  .full article:only-child .value { font-size: 118px; }
+  .full article:only-child .value.long { font-size: 85px; }
+  .label, .note { font-size: 42px; line-height: 1.24; }
+  .value { font-size: 92px; line-height: 1.03; font-weight: 850; color: #9de7d8; }
+  .value.long { font-size: 61px; line-height: 1.15; }
+  .note { font-size: 34px; color: #cee1e9; }
+  .items.dense article { min-height: 160px; padding: 23px 29px; gap: 12px; }
+  .items.dense .value { font-size: 68px; }
+  .items.dense .label { font-size: 36px; }
+  .band { gap: 5px; }
+  .band article { border-radius: 5px; border-top: 8px solid #81e1d1; }
+  .band article::before, .hbars article::before { display: none; }
+  .subj article .label { width: fit-content; padding: 10px 22px; border-radius: 34px; background: #416779; }
+  .track .meter { height: 36px; margin-top: 22px; }
+  .items.hbars { grid-template-columns: 1fr; gap: 10px; }
+  .items.hbars article { display: grid; align-items: center; grid-template-columns: 25% 1fr 18%;
+    min-height: 66px; padding: 12px 26px; border-radius: 14px; }
+  .hbars .label, .hbars .value { font-size: 32px; }
+  .hbars .meter { grid-area: 1 / 2; }
+  .hbars .value { grid-area: 1 / 3; }
+  .hbars .note { grid-column: 1 / -1; font-size: 25px; }
+  .versus article:nth-child(2n) { background: linear-gradient(145deg, #345777, #213950); }
+  .versus article:nth-child(2n)::before { background: #a3c7f1; }
+  .split article + article::after { content: "→"; position: absolute; left: -45px; top: 45%;
+    color: #9de7d8; font-size: 56px; line-height: 1; }
+  .split { gap: 58px; }
+  .ladder { align-items: end; align-content: end; }
+  .items.ladder article { height: var(--height); min-height: 0; padding-inline: 25px; }
+  .ladder .value { font-size: 62px; }
+  .meter { height: 20px; background: #091f31; border-radius: 12px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: var(--pct); background: #81e1d1; }
+  .ring .meter { width: 116px; height: 116px; border-radius: 50%;
+    background: conic-gradient(#81e1d1 var(--pct), #091f31 var(--pct)); }
+  .ring .meter i { width: 86px; height: 86px; margin: 15px; border-radius: 50%; background: #244858; }
+  #capbar { position: absolute; bottom: 51px; left: 118px; right: 118px; height: 88px;
+    line-height: 88px; background: rgba(2,5,9,.60); text-align: center; border-radius: 17px;
+    font-size: 54px; font-weight: 650; white-space: nowrap; }
+</style>
+<main id="stage">
+  <div id="capbar"><span></span></div>
+</main>
+<script src="video-data.js"></script>
+<script>
+  const data = window.ORANGEVIDEO;
+  const CUES = data.cues;
+  const stage = document.querySelector("#stage");
+  const bar = document.querySelector("#capbar");
+  const subtitle = bar.querySelector("span");
+  const clamp = (value) => Math.min(1, Math.max(0, value));
+
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function buildShot(shot) {
+    const frame = element("section", `shot ${shot.mode}${shot.img ? " photo" : ""}`);
+    if (shot.img) {
+      const image = element("img");
+      image.src = shot.img;
+      image.alt = "";
+      frame.append(image);
+    }
+    frame.append(element("h1", "", shot.title));
+    const items = shot.items ?? [];
+    const cards = element("div", `items ${shot.type ?? ""}${items.length > 3 ? " dense" : ""}`);
+    cards.style.setProperty("--columns", Math.min(shot.type === "ladder" ? 6 : 3, items.length || 1));
+    const articles = items.map((item, index) => {
+      const article = element("article");
+      article.style.setProperty("--height", `${182 + index * 46}px`);
+      article.append(element("div", "label", item.label));
+      if (item.value !== undefined) {
+        article.append(element("div", String(item.value).length > 6 ? "value long" : "value", item.value));
+      }
+      if (item.note) article.append(element("div", "note", item.note));
+      if (["track", "ring", "hbars"].includes(shot.type)) {
+        const meter = element("div", "meter");
+        meter.style.setProperty("--pct", `${item.pct}%`);
+        meter.append(element("i"));
+        article.append(meter);
+      }
+      cards.append(article);
+      return article;
+    });
+    frame.append(cards);
+    stage.insertBefore(frame, bar);
+    return { shot, frame, items, articles };
+  }
+
+  const frames = data.shots.map(buildShot);
+  window.CUES = CUES;
+  window.__duration = data.duration;
+  window.__render = (time) => {
+    const active = frames.find(({ shot }) => shot.t0 <= time && time < shot.t1) ?? frames.at(-1);
+    for (const entry of frames) entry.frame.hidden = entry !== active;
+    active.articles.forEach((article, index) => {
+      const at = active.items[index].at ?? active.shot.t0;
+      const progress = clamp((time - at) / 0.24);
+      const eased = 1 - (1 - progress) ** 3;
+      article.style.opacity = time < at ? 0 : 0.4 + 0.6 * eased;
+      article.style.transform = `translateY(${14 * (1 - eased)}px)`;
+    });
+    const cue = CUES.find((line) => line.t0 <= time && time < line.t1);
+    subtitle.textContent = cue?.text ?? "";
+    bar.hidden = !cue;
+  };
+  window.__render(0);
+</script>
+</html>

@@ -16,6 +16,7 @@ const puppeteer = loadPuppeteer();
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { pathToFileURL } = require('url');
 
 // 工程根目录 = 当前工作目录（脚本本体在技能目录里，__dirname 不能用）
 const ROOT = process.env.PROJ || process.cwd();
@@ -25,6 +26,7 @@ const TIMES = (process.env.TIMES || '0').split(',').map(Number);
 
 function firstExisting(list) { for (const p of list) if (p && fs.existsSync(p)) return p; return null; }
 const CHROME = firstExisting([
+  process.env.CHROME_PATH,
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
   (process.env.LOCALAPPDATA || '') + '/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
@@ -43,7 +45,7 @@ const CHROME = firstExisting([
   await page.setCacheEnabled(false);
   page.on('pageerror', e => console.log('PAGEERROR ' + e.message));
   await page.setViewport({ width: CW, height: CH, deviceScaleFactor: 1 });
-  await page.goto('file:///' + path.join(ROOT, 'index.html').replace(/\\/g, '/'), { waitUntil: 'load' });
+  await page.goto(pathToFileURL(path.join(ROOT, 'index.html')).href, { waitUntil: 'load' });
   await page.waitForFunction('typeof window.__render === "function"');
   await page.evaluate(async () => {
     await document.fonts.ready;

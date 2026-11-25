@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -18,11 +19,32 @@ PODCAST = (
 )
 
 
+def split_script(text, limit):
+    chunks = []
+    remaining = text
+    while len(remaining) > limit:
+        window = remaining[:limit]
+        for separators in (r"[。！？；!?;\n]", r"[，、：,:]"):
+            cuts = [match.end() for match in re.finditer(separators, window)
+                    if match.end() >= limit // 3]
+            if cuts:
+                break
+        else:
+            raise ValueError("朗读稿有过长的无标点片段，请加自然断句。")
+        cut = cuts[-1]
+        chunks.append(remaining[:cut].strip())
+        remaining = remaining[cut:].lstrip()
+    if remaining:
+        chunks.append(remaining)
+    return chunks
+
+
 def synthesize(args):
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
     os.environ.setdefault("NUMBA_CACHE_DIR", str(Path(tempfile.gettempdir()) / "orangevideo-numba"))
 
+    import numpy as np
     import soundfile
     import torch
     from qwen_tts import Qwen3TTSModel
@@ -31,6 +53,7 @@ def synthesize(args):
     reference_text = args.reference_text.read_text(encoding="utf-8-sig").strip()
     if not text or not reference_text:
         raise ValueError("口播稿和参考逐字稿都需要有正文。")
+    chunks = split_script(text, args.max_chars)
     reference = soundfile.read(args.reference_wav, dtype="float32")
     device = args.device
     if device == "auto":
@@ -44,10 +67,25 @@ def synthesize(args):
     )
     torch.manual_seed(args.seed)
     with torch.inference_mode():
-        tracks, rate = model.generate_voice_clone(
-            text=text, language="Chinese", ref_audio=reference, ref_text=reference_text,
-        )
-    return tracks[0], rate
+        if len(chunks) == 1:
+            tracks, rate = model.generate_voice_clone(
+                text=text, language="Chinese", ref_audio=reference, ref_text=reference_text,
+            )
+            return tracks[0], rate
+        prompt = model.create_voice_clone_prompt(ref_audio=reference, ref_text=reference_text)
+        parts = []
+        for index, chunk in enumerate(chunks, 1):
+            print(f"生成第 {index}/{len(chunks)} 段", flush=True)
+            tracks, rate = model.generate_voice_clone(
+                text=chunk, language="Chinese", voice_clone_prompt=prompt,
+            )
+            track = tracks[0]
+            if not track.size or not np.isfinite(track).all() or not np.any(track):
+                raise ValueError(f"第 {index} 段音频为空或无效。")
+            if parts:
+                parts.append(np.zeros(round(rate * 0.18), dtype=track.dtype))
+            parts.append(track)
+    return np.concatenate(parts), rate
 
 
 def process_audio(ffmpeg, waveform, rate, filters, peak_limit):
@@ -93,6 +131,7 @@ def main():
     parser.add_argument("--reference-text", type=Path, help="参考 WAV 的 UTF-8 逐字稿")
     parser.add_argument("--device", default="auto", help="默认 auto，可指定 cuda:0 或 cpu")
     parser.add_argument("--seed", type=int, default=20261125)
+    parser.add_argument("--max-chars", type=int, default=180, help="长稿合成时每段最多的字符数")
     parser.add_argument("--dry-out", type=Path, help="另存合成干声")
     parser.add_argument("--out", type=Path, help="轻播客版 WAV")
     args = parser.parse_args()
@@ -103,6 +142,8 @@ def main():
         parser.error("--dry-out 仅用于 --text 合成模式")
     if not (args.out or args.dry_out):
         parser.error("需要 --out 或 --dry-out")
+    if args.max_chars < 60:
+        parser.error("--max-chars 至少为 60")
     protected = {path.resolve() for path in (args.text, args.input_wav, args.reference_wav, args.reference_text) if path}
     for path in filter(None, (args.out, args.dry_out)):
         if path.suffix.lower() != ".wav" or path.resolve() in protected:

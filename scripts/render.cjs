@@ -17,6 +17,7 @@ const puppeteer = loadPuppeteer();
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { pathToFileURL } = require('url');
 const { execFileSync } = require('child_process');
 
 // 工程根目录 = 当前工作目录（脚本本体在技能目录里，__dirname 不能用）
@@ -30,12 +31,14 @@ const OUT = path.join(ROOT, process.env.OUT || 'out.mp4');
 function firstExisting(list) { for (const p of list) if (p && fs.existsSync(p)) return p; return null; }
 function findChrome() {
   return firstExisting([
+    process.env.CHROME_PATH,
     'C:/Program Files/Google/Chrome/Application/chrome.exe',
     (process.env.LOCALAPPDATA || '') + '/Google/Chrome/Application/chrome.exe',
     'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
   ]);
 }
 function findFfmpeg() {
+  if (process.env.FFMPEG) return process.env.FFMPEG;
   const base = path.join(process.env.LOCALAPPDATA || '', 'Microsoft/WinGet/Packages');
   if (fs.existsSync(base)) {
     for (const d of fs.readdirSync(base)) {
@@ -62,9 +65,11 @@ const log = (m) => process.stdout.write(m + '\n');
   });
   const page = await browser.newPage();
   await page.setCacheEnabled(false);
-  page.on('pageerror', e => log('PAGEERROR ' + e.message));
+  let pageError;
+  page.on('pageerror', (error) => { pageError = error; });
   await page.setViewport({ width: CW, height: CH, deviceScaleFactor: DSF });
-  await page.goto('file:///' + path.join(ROOT, 'index.html').replace(/\\/g, '/'), { waitUntil: 'load' });
+  await page.goto(pathToFileURL(path.join(ROOT, 'index.html')).href, { waitUntil: 'load' });
+  if (pageError) throw pageError;
   await page.waitForFunction('typeof window.__render === "function"');
   await page.evaluate(async () => {
     await Promise.all([...document.fonts].map(f => document.fonts.load(`${f.weight} 64px "${f.family}"`, '测试0123').catch(() => {})));
@@ -81,7 +86,10 @@ const log = (m) => process.stdout.write(m + '\n');
   const DUR = await page.evaluate('window.__duration');
   const START = +(process.env.START || 0);
   const END = Math.min(+(process.env.END || DUR), DUR);
-  const total = Math.round((END - START) * FPS);
+  if (!Number.isFinite(DUR) || !Number.isFinite(FPS) || FPS <= 0 || !(0 <= START && START < END)) {
+    throw new Error('无效的工程时长、渲染区间或帧率');
+  }
+  const total = Math.ceil((END - START) * FPS - 1e-8);
   const OFF = +(process.env.OFFSET || 0);
   log(`duration=${DUR} range=${START}-${END} frames=${total} dsf=${DSF}`);
 
@@ -89,6 +97,7 @@ const log = (m) => process.stdout.write(m + '\n');
   for (let i = 0; i < total; i++) {
     const t = START + i / FPS;
     await page.evaluate((tt) => window.__render(tt), t);
+    if (pageError) throw pageError;
     await page.screenshot({
       type: 'jpeg', quality: 93,
       path: path.join(FRAMES, 'f-' + String(i + OFF).padStart(5, '0') + '.jpg')
@@ -99,7 +108,9 @@ const log = (m) => process.stdout.write(m + '\n');
   log('frames done ' + ((Date.now() - t0) / 1000).toFixed(1) + 's');
   if (process.env.NOENC) { log('SKIP ENCODE'); return; }
 
-  execFileSync(findFfmpeg(), ['-y', '-framerate', String(FPS), '-i', path.join(FRAMES, 'f-%05d.jpg'),
+  execFileSync(findFfmpeg(), ['-y', '-framerate', String(FPS), '-start_number', String(OFF),
+    '-i', path.join(FRAMES, 'f-%05d.jpg'),
+    '-frames:v', String(total),
     '-vf', 'scale=in_range=full:out_range=tv:flags=lanczos,format=yuv420p',
     '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
     '-c:v', 'libx264', '-crf', '19', '-preset', 'medium', '-pix_fmt', 'yuv420p',

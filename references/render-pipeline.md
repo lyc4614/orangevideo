@@ -33,6 +33,9 @@ PUPPETEER_NM="$HOME/code/node_modules" node scripts/render.cjs
 | `window.__render(t)` | 把画面定格在第 t 秒 |
 | `window.__duration` | 总时长，`render.cjs` 用它算帧数 |
 
+纯文稿工程可用 [随包模板](text-to-video.md) 生成这个页面。用 `CHROME_PATH` 指定 Chrome/Edge
+可执行文件，用 `FFMPEG` 指定编码器。每次全片渲染选新的 `FRAME_DIR`。
+
 渲染前要等字体和图片真的加载完 —— `render.cjs` 里已处理：只等**有 src** 的 `<img>`，
 空 `<img>` 的 `complete` 为 true 但 `naturalWidth` 为 0，不排除会挂到 protocolTimeout。
 

@@ -15,6 +15,11 @@ git clone https://github.com/lyc4614/orangevideo.git ~/.workbuddy/skills/orangev
 
 没装 git 就下载 ZIP 解压到同一位置，详见 [安装](#安装)。
 
+## 只给原稿，生成成片
+
+用本机已确认的口播音色读新稿，从实际音频提取词和字幕时间，按说到的位置排镜头与动画，再渲染、混流和检验成片。
+没有图卡时，随包模板可用原稿中的事实和关系制作信息图卡及解释层。见 [纯文稿到成片](references/text-to-video.md)。
+
 ---
 
 ## 它拦住了哪三次翻车
@@ -63,7 +68,9 @@ orangevideo/
 │   ├── explain-components.md     8 种解释层组件：分档/轨道/环形/条形/阶梯/分击/对比/胶囊
 │   ├── subtitle-engine.md        双源合并、字宽度量、断点惩罚、960 陷阱
 │   ├── audio-tts.md              固定音色、本地轻播客口播、数字读法、复读检测与响度
+│   ├── text-to-video.md          原稿起片、词级对齐、分镜、渲染与交付
 │   └── render-pipeline.md        puppeteer 渲染、TV range 编码、四项体检、交付归档
+├── templates/text-video.html     纯文稿起片用的横屏渲染模板
 └── scripts/
     ├── build_cues.py             SRT 时间轴 + 原稿标点 difflib 对齐 → 单行无句尾标点
     ├── check_spec.py             字幕数据层 + 分镜配比体检（--fix 可自动改写）
@@ -71,6 +78,8 @@ orangevideo/
     ├── still.cjs                 按时间点出静帧，验收单镜
     ├── render.cjs                逐帧渲染 + 编码
     ├── qwen3_podcast.py          本地 Qwen3-TTS 定制男声 + 轻播客后期
+    ├── align_narration.py        原稿与最终口播对齐，导出字幕和词级时间轴
+    ├── prepare_video.py          使用 templates/text-video.html 创建渲染工程
     ├── mkloudnorm.py             常数增益 + 限幅 + 可选直出混流与复测
     └── mkcut4.cjs                品红底区域生长泛洪抠图（旧 3D 素材流程遗留，解释层用不上）
 ```
