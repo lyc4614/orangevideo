@@ -1,8 +1,8 @@
 # 口播：音色、读法、复读、响度
 
-## 一、音色已锁定，不再试音
+## 一、已确认的配音音色
 
-`视频制作/_tts/voice_standard.json` 是唯一权威：
+常规 F5-TTS 口播沿用 `视频制作/_tts/voice_standard.json`。用户指定「定制知识讲解男声」或「轻播客」时，用下方 Qwen3-TTS 流程。
 
 | 项 | 值 |
 |---|---|
@@ -12,7 +12,74 @@
 | 后期 | `chain_a` → `acompressor` → `alimiter` → `loudnorm I=-16 TP=-1.5 LRA=11` |
 | 导出 | 48kHz 单声道 / libmp3lame 192k |
 
-**每条约片直接读这个文件，不再逐次试音。** 换参数前先问用户。
+**使用 F5-TTS 时直接读这个文件。** 变更这套锁定参数前先问用户。
+
+### 本地 Qwen3-TTS 轻播客口播
+
+这套音色用于升学和知识讲解。听感以成熟、温和、有把握的普通话男声为准，保留清楚的重音和自然停顿。
+
+1. **固定声音参考。** 复用确认过的原始试听 WAV 与逐字稿。本机可从工作区的
+   `素材库/口播音色/知识讲解男声/` 找 `参考.wav` 和 `参考.txt`。首次做自己的声音时，
+   用 **Qwen3-TTS 1.7B VoiceDesign** 生成并试听，例如「35 岁左右的普通话男声，像有经验的老师给成年人讲新概念，
+   吐字清楚、语气平实，关键词轻微重读，句尾自然停顿」。选定后保存同一条原始试听和对应文字，后续项目直接复用。
+2. **用 Base 读新稿。** 需要本地的 **Qwen3-TTS-12Hz-1.7B-Base** 权重和支持设备的 PyTorch，
+   以及 `qwen-tts`、`numpy`、`soundfile` 和 FFmpeg。已验证 `qwen-tts==0.1.1`。
+   `--model` 指向已下载的模型目录，本地推理无需 API 密钥。优先复用已有环境和权重。
+   FFmpeg 可通过 `PATH` 或 `FFMPEG` 环境变量指定。模型和软件安装见
+   [Qwen3-TTS 官方项目](https://github.com/QwenLM/Qwen3-TTS)。
+   口播稿用 UTF-8 纯文本，保留标点与段落，按读法展开数字并去掉 Markdown 标记。
+   字幕仍用原稿。长稿按完整句段分批，同一对参考文件配合 `--dry-out` 导出各段干声。
+   逐段核对后按原顺序拼接，再给整轨统一做后期。
+3. **按原朗读做轻播客后期。** 先做 A 版柔化（3 kHz −3.8 dB、5.1 kHz 高频搁架 −3.2 dB、
+   180 Hz 低频搁架 +1.1 dB），再做 C 版（58 Hz 高通、170 Hz +1.65 dB、335 Hz −0.85 dB、
+   1.15 kHz +0.45 dB、轻压缩 1.55∶1，起音 14 ms、释放 125 ms）。
+   两步各用常数增益把 RMS 电平尽量对齐到输入，优先保留峰值余量。原音频的语速、停顿、样本数和采样率照常保留。
+   已有选定的单声道干声 WAV 时，用 `--input-wav` 直接处理。对已做过上述后期的音频使用现成文件。
+
+在视频项目目录运行。示例里的脚本和模型路径替换成实际位置。
+
+```bash
+python "path/to/orangevideo/scripts/qwen3_podcast.py" --text "audio/口播稿.txt" --model "models/Qwen3-TTS-12Hz-1.7B-Base" --reference-wav "素材库/口播音色/知识讲解男声/参考.wav" --reference-text "素材库/口播音色/知识讲解男声/参考.txt" --dry-out audio/tts_raw.wav --out audio/pp.wav
+
+# 已有干声时只做音色后期
+python "path/to/orangevideo/scripts/qwen3_podcast.py" --input-wav audio/tts_raw.wav --out audio/pp.wav
+```
+
+用本地 ASR 对最终 `audio/pp.wav` 生成带时间轴的 `audio/source.srt`。核对专名、数字、关键句和句尾，
+并按第四节查复读后，再进 `build_cues.py`。成片响度在混流阶段按第五节处理。
+参考录音、参考稿和模型权重保存在本地工作区。
+
+工程缺少 SRT 生成器时，可用已安装的 `faster-whisper` 和本地模型走下方步骤。
+模型目录替换成实际位置，转写后仍按原稿核对。
+
+```python
+from pathlib import Path
+
+import soundfile
+from faster_whisper import WhisperModel
+
+
+def timestamp(seconds):
+    hours, remainder = divmod(round(seconds * 1000), 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    secs, ms = divmod(remainder, 1000)
+    return f"{hours:02}:{minutes:02}:{secs:02},{ms:03}"
+
+
+model = WhisperModel("models/faster-whisper-small", device="cpu", compute_type="int8", local_files_only=True)
+audio_path = "audio/pp.wav"
+duration = soundfile.info(audio_path).duration
+segments, _ = model.transcribe(audio_path, language="zh")
+with Path("audio/source.srt").open("w", encoding="utf-8") as srt:
+    index = 0
+    for segment in segments:
+        end = min(segment.end, duration)
+        text = segment.text.strip()
+        if end <= segment.start or not text:
+            continue
+        index += 1
+        srt.write(f"{index}\n{timestamp(segment.start)} --> {timestamp(end)}\n{text}\n\n")
+```
 
 ## 二、停顿表（跟标点走）
 

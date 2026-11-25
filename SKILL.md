@@ -3,7 +3,7 @@ name: orangevideo
 description: |
   橙子老师视频成片流水线（口播音频 / 文稿 / 图卡 → 横屏成片）。本 skill 是「做视频」类任务的
   唯一入口：做视频、出成片、剪一条片子、改这条片子、根据文稿或 SRT 做口播视频、写分镜、
-  配字幕、给图卡做动画、渲染、压片、交付。
+  配字幕、给图卡做动画、渲染、压片、交付。也用于为这类视频配音，或复用定制知识讲解男声、轻播客音色。
   承载四条不能破的视觉红线（字幕单行不换行、结尾不带标点、图片是主体解释动画是标点、
   画面不留非必要小字）、字幕引擎、解释层组件（修饰卡片 / 动态数据图表）、渲染编码、响度与交付规矩。
 license: MIT
@@ -44,6 +44,11 @@ agent_created: true
 [references/subtitle-engine.md](references/subtitle-engine.md)。
 
 ## 一、起片 SOP（按顺序做，别跳）
+
+只有文稿且指定「定制知识讲解男声」或「轻播客」时，从
+[Qwen3-TTS 本地轻播客口播](references/audio-tts.md#本地-qwen3-tts-轻播客口播)
+生成 `audio/pp.wav`。用成品口播转写带时间轴的 `audio/source.srt`，再从第 ① 步起片。
+已有用户指定的录音时，直接使用录音；缺 SRT 时从该录音转写。
 
 ```bash
 # ① 字幕：SRT 时间轴 + 原稿标点 双源合并 → 单行、无句尾标点
@@ -112,6 +117,7 @@ python scripts/mkloudnorm.py --check 成片.mp4    # 开头 0–3s vs 全片中�
 | `scripts/still.cjs` | 按时间点出静帧验收 | `TIMES=48.5,80.5` |
 | `scripts/render.cjs` | 逐帧渲染 + 编码 | `FRAME_DIR` `OUT` `START` `END` `NOENC` |
 | `scripts/mkloudnorm.py` | **常数增益 + 限幅**混流/体检（默认 flat，不用 dynamic） | `--in --out --video --measure --check` |
+| `scripts/qwen3_podcast.py` | 本地定制男声与轻播客后期 | `--text` 或 `--input-wav`，`--out` |
 | `scripts/mkcut4.cjs` | 品红底泛洪抠图 | `<源图> <名字> [裁底部px] [pad] [容差]` |
 
 `check_spec.py` 判定口径：`full` 30–65%、`blur` 25–45%、`plain` ≤15%、

@@ -62,7 +62,7 @@ orangevideo/
 │   ├── visual-rules.md           镜头模式与配比、full/blur/plain 参数、版面固定值、fit 烤字保护
 │   ├── explain-components.md     8 种解释层组件：分档/轨道/环形/条形/阶梯/分击/对比/胶囊
 │   ├── subtitle-engine.md        双源合并、字宽度量、断点惩罚、960 陷阱
-│   ├── audio-tts.md              音色锁定、数字读法、复读检测、两遍 loudnorm
+│   ├── audio-tts.md              固定音色、本地轻播客口播、数字读法、复读检测与响度
 │   └── render-pipeline.md        puppeteer 渲染、TV range 编码、四项体检、交付归档
 └── scripts/
     ├── build_cues.py             SRT 时间轴 + 原稿标点 difflib 对齐 → 单行无句尾标点
@@ -70,7 +70,8 @@ orangevideo/
     ├── check_cap_render.cjs      字幕渲染层体检（抓浏览器折行）
     ├── still.cjs                 按时间点出静帧，验收单镜
     ├── render.cjs                逐帧渲染 + 编码
-    ├── mkloudnorm.py             两遍 loudnorm + 可选直出混流 + 自动复测
+    ├── qwen3_podcast.py          本地 Qwen3-TTS 定制男声 + 轻播客后期
+    ├── mkloudnorm.py             常数增益 + 限幅 + 可选直出混流与复测
     └── mkcut4.cjs                品红底区域生长泛洪抠图（旧 3D 素材流程遗留，解释层用不上）
 ```
 
