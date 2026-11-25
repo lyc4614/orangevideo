@@ -114,7 +114,7 @@ python scripts/mkloudnorm.py --check 成片.mp4    # 开头 0–3s vs 全片中�
 | 脚本 | 用途 | 关键参数 |
 |---|---|---|
 | `scripts/build_cues.py` | SRT + 原稿 → 单行字幕 | `--srt --docx/--txt --out-json --maxline` |
-| `scripts/check_spec.py` | **字幕数据层 + 分镜配比**体检 | `--shots shots.js`；`--fix out.json` 可改写 |
+| `scripts/check_spec.py` | **字幕数据层 + 分镜配比**体检 | `--shots shots.js`；`--fix out.json` 可改写；`--viz` 无图卡工程 |
 | `scripts/check_cap_render.cjs` | **字幕渲染层**体检（抓浏览器折行） | `<index.html>` |
 | `scripts/still.cjs` | 按时间点出静帧验收 | `TIMES=48.5,80.5` |
 | `scripts/render.cjs` | 逐帧渲染 + 编码 | `FRAME_DIR` `OUT` `START` `END` `NOENC` |
@@ -126,6 +126,18 @@ python scripts/mkloudnorm.py --check 成片.mp4    # 开头 0–3s vs 全片中�
 
 `check_spec.py` 判定口径：`full` 30–65%、`blur` 25–45%、`plain` ≤15%、
 解释层没有 `type`（组件）直接报错、单镜 > 11s 提示、字幕超 26 字宽 / 含换行 / 句尾带标点报错。
+
+**没有用户图卡、全是数据图形的工程加 `--viz`**：镜头用 `type` 而不是 `mode`，判据换成
+「纯字镜头（`quote`/`none`）≤ 20%」，同时校验 `seg` 标记数与 `type` 数是否对得上。
+
+```bash
+python scripts/check_spec.py data/cues.json --shots shots.js --viz
+```
+
+不加 `--viz` 时这类工程解析不到 `mode`，只会给一条提示、然后照样打印「通过」——
+等于分镜部分根本没体检。**只查了字幕就交付，红线 3 是漏的。**
+
+拆段时数字不会被切开：`78.22 万` 不会断成 `78.` / `22万`，空格处也不会把数字和单位拆开。
 
 ## 四、交付前 checklist（缺一项都不算完成）
 

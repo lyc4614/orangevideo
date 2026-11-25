@@ -230,6 +230,9 @@ python scripts/build_cues.py --srt audio/source.srt --docx 原稿.docx \
 # 2. 数据层体检（字幕 + 分镜配比）
 python scripts/check_spec.py data/cues.json --shots shots.js
 
+# 2b. 没有用户图卡、全是数据图形的工程加 --viz（判据换成「纯字镜头 <=20%」）
+python scripts/check_spec.py data/cues.json --shots shots.js --viz
+
 # 3. 渲染层体检（必须跑，数据层过了不代表没折行）
 PUPPETEER_NM="/path/to/node_modules" node scripts/check_cap_render.cjs index.html
 
