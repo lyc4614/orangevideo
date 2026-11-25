@@ -24,6 +24,8 @@ FULLWIDTH = re.compile(r"[\u3000-\u303f\u4e00-\u9fff\uff01-\uff60]")
 # 句末/句中分隔类标点（不含引号括号，`」` `”` 收尾是正常用法）
 TAIL_PUNCT = "，。、；：！？,.;:!?…—～·"
 OPEN_QUOTES = "（(【[「『“‘"
+# 切分断点只认中文标点：ASCII 的 `.` 会把「78.22 万」切成「78.」「22万」
+CUT_PUNCT = "，。、；：！？"
 
 
 def char_w(ch: str) -> float:
@@ -121,12 +123,39 @@ def check_cues(cues, maxem, vps_max):
     return errors, warns
 
 
-def check_shots(path, full_min=0.30, full_max=0.65, blur_min=0.25, dur_max=11.0):
+def check_shots(path, full_min=0.30, full_max=0.65, blur_min=0.25, dur_max=11.0, viz=False):
     """红线 3 是双边约束：
     full 太少 = 把用户给的图片全糊掉了；full 太多 = 退化成图片轮播。
     中间必须有足够时长的解释层（blur/hero），而且解释层得有实物元素，不能只有字。
+
+    viz=True 用于「没有用户图卡、全是数据图形」的工程：这时镜头用 type 而不是 mode，
+    判据换成「纯字镜头（quote/none）不超过 20%」—— 图表是主体，金句只能当标点。
     """
     src = open(path, encoding="utf-8-sig").read().replace("\r\n", "\n")
+
+    if viz:
+        types = re.findall(r"""["']?type["']?\s*:\s*["']([a-z]+)["']""", src)
+        nseg = len(re.findall(r"""["']?seg["']?\s*:\s*\[""", src))
+        errors, warns, info = [], [], []
+        if not types:
+            warns.append("没解析到 type，确认这是数据可视化工程的 shots.js 吗")
+            return errors, warns, info
+        cnt = {}
+        for t in types:
+            cnt[t] = cnt.get(t, 0) + 1
+        n = len(types)
+        pure = cnt.get("quote", 0) + cnt.get("none", 0)
+        info.append(f"镜头 {n} 个：" + " / ".join(f"{k} {v}" for k, v in sorted(cnt.items(), key=lambda x: -x[1])))
+        info.append(f"纯字镜头 {pure / n * 100:.0f}%（上限 20%）")
+        if nseg and nseg != n:
+            warns.append(f"seg 标记 {nseg} 个与 type {n} 个对不上")
+        if pure / n > 0.20:
+            errors.append(
+                f"红线3 纯字镜头占 {pure / n * 100:.0f}%（{pure}/{n}），超过 20% "
+                f"—— 画面退化成「深色底 + 几行字」，需要有实体图形"
+            )
+        return errors, warns, info
+
     modes = re.findall(r"""["']?mode["']?\s*:\s*["']([a-z]+)["']""", src)
     spans = re.findall(
         r"""["']?t0["']?\\s*:\\s*([\\d.]+)\\s*,\\s*["']?t1["']?\\s*:\\s*([\\d.]+)""", src
@@ -196,7 +225,10 @@ def check_shots(path, full_min=0.30, full_max=0.65, blur_min=0.25, dur_max=11.0)
 
 
 def best_cut(src, start, ideal, unit=char_w):
-    """在理想位置附近找最合适的断点：标点 0 罚 / 空格 0.6 / 词中间 14。"""
+    """在理想位置附近找最合适的断点：中文标点 0 罚 / 空格 0.6 / 中间 14。
+
+    数字（含 `.` `%`）前后不切 —— 英文句点不是断句点。
+    """
     pref = width(src[:start])
     acc, best, best_score = 0.0, -1, 1e9
     for i in range(start, len(src)):
@@ -207,8 +239,16 @@ def best_cut(src, start, ideal, unit=char_w):
         left, right = pref + acc, width(src[at:])
         if left < 3 or right < 3:
             continue
-        ch = src[i]
-        pen = 0.0 if ch in TAIL_PUNCT else (0.6 if ch == " " else 14.0)
+        ch, nxt = src[i], src[at]
+        if ch in CUT_PUNCT:
+            pen = 0.0
+        elif ch == " ":
+            # 空格可以切，但不能把数字和单位拆开：「78.22 万」不在空格处断
+            pen = 60.0 if src[i - 1].isdigit() else 0.6
+        elif ch.isdigit() or ch in ".%" or nxt.isdigit() or nxt in ".%":
+            pen = 60.0
+        else:
+            pen = 14.0
         score = abs(left - ideal) + pen
         if score < best_score:
             best_score, best = score, at
@@ -281,6 +321,8 @@ def main():
     ap.add_argument("--vps", type=float, default=9.0, help="语速上限 字/秒，默认 9")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     ap.add_argument("--fix", metavar="OUT", help="按红线改写：去句尾标点 + 单行拆段，写 OUT（.json 或 .srt）")
+    ap.add_argument("--viz", action="store_true",
+                    help="无图卡工程：按 type 统计，检查纯字镜头占比（默认上限 20%%）")
     a = ap.parse_args()
 
     try:
@@ -310,7 +352,7 @@ def main():
 
     if a.shots:
         try:
-            e2, w2, i2 = check_shots(a.shots)
+            e2, w2, i2 = check_shots(a.shots, viz=a.viz)
             errors += e2
             warns += w2
             info += i2
