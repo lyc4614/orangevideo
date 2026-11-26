@@ -101,7 +101,10 @@ TIMES=… node scripts/still.cjs                                   # 8–10 张�
 
 ## 一、起片 SOP（按顺序做，别跳）
 
-**只有原稿就起片。** 按 [纯文稿到成片](references/text-to-video.md) 依次完成配音、实际语音对齐、
+**只有原稿就起片。** 输入是 `.docx` 时先用 `scripts/docx_to_script.py` 提正文
+（按句分段，一段一句给 TTS 换气），再照着
+[纯文稿到成片](references/text-to-video.md) 的第一节把书面稿改成朗读稿 ——
+数字、百分比、箭头、英文缩写、括号都要换成念得出来的写法。然后依次完成配音、实际语音对齐、
 语义分镜、渲染、混流和验收。升学与知识讲解默认使用本机已确认的轻播客知识讲解男声，显式指定的音色或录音优先。
 分镜和动画以成品口播的时间标记为准。没有图卡时用解释层组件（卡片 / 图表 / 纯大字）
 把这句话讲清楚 —— 组件和字幕天然对齐，比另找一张图更稳。见「〇·五 画面配方」。
@@ -169,6 +172,7 @@ python scripts/mkloudnorm.py --check 成片.mp4    # 开头 0–3s vs 全片中�
 
 | 脚本 | 用途 | 关键参数 |
 |---|---|---|
+| `scripts/docx_to_script.py` | **Word / Markdown → 朗读稿 txt**（按句分段） | `原稿.docx --out 原稿.txt` |
 | `scripts/build_cues.py` | SRT + 原稿 → 单行字幕 | `--srt --docx/--txt --out-json --maxline` |
 | `scripts/check_spec.py` | **字幕数据层 + 分镜配比**体检 | `--shots shots.js`；`--fix out.json` 可改写；`--viz` 无图卡工程 |
 | `scripts/check_cap_render.cjs` | **字幕渲染层**体检（抓浏览器折行） | `<index.html>` |
